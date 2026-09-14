@@ -85,6 +85,40 @@ get_disk_usage() {
     ' <<< "$df_output"
 }
 
+get_process_table() {
+    local sort_key=$1
+    local title=$2
+    local output sep
+
+    output=$(ps -eo pid,user,pcpu,pmem,comm --sort="${sort_key}" 2>/dev/null) || {
+        echo "Error: could not retrieve process listing from ps." >&2
+        exit 1
+    }
+
+    printf '%s\n' "$title"
+    printf -v sep '%*s' "${#title}" ""
+    printf '%s\n' "${sep// /-}"
+    printf '%-7s %-12s %6s %6s  %s\n' "PID" "USER" "CPU%" "MEM%" "COMMAND"
+    awk '
+        NR > 1 {
+            if ($5 == "ps") next
+            printf "%-7s %-12s %6.1f %6.1f  %s\n", $1, $2, $3, $4, $5
+            if (++count == 5) exit
+        }
+    ' <<< "$output"
+}
+
+get_process_stats() {
+    if ! command -v ps >/dev/null 2>&1; then
+        echo "Error: ps command not found. Process statistics require procps." >&2
+        exit 1
+    fi
+
+    get_process_table "-pcpu" "Top 5 Processes by CPU Usage"
+    printf '\n'
+    get_process_table "-pmem" "Top 5 Processes by Memory Usage"
+}
+
 main() {
     local cpu_usage
 
@@ -97,6 +131,8 @@ main() {
     get_memory_usage
     printf '\n'
     get_disk_usage
+    printf '\n'
+    get_process_stats
 }
 
 main "$@"

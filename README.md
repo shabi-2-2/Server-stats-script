@@ -18,11 +18,10 @@ Completed phases:
 - **Phase 02 - CPU Statistics**: Total CPU usage percentage, calculated from `/proc/stat`.
 - **Phase 03 - Memory Statistics**: Total, used, and available memory plus usage percentage, read from `/proc/meminfo`.
 - **Phase 04 - Disk Statistics**: Total, used, and available disk space for `/`, plus usage percentage, collected with `df -B1 /`.
+- **Phase 05 - Process Statistics**: Top 5 processes by CPU usage and top 5 by memory usage, collected with `ps`.
 
 Not yet implemented (planned for later phases):
 
-- Top 5 processes by CPU usage
-- Top 5 processes by memory usage
 - Optional system information (OS version, uptime, load average, logged-in users, failed login attempts)
 
 ## How CPU Usage Is Calculated
@@ -80,6 +79,19 @@ Error handling covers: `df` not being available, the root filesystem not being i
 
 If `/proc/meminfo` is missing or unreadable, the script prints a clear error message and exits with a non-zero status.
 
+## How Process Statistics Are Calculated
+
+Process information is collected with the standard Linux `ps` command. The script displays the **top 5 processes by CPU usage** and the **top 5 processes by memory usage**, showing PID, USER, CPU%, MEM%, and COMMAND for each.
+
+Sorting is delegated to `ps` via its built-in sort option rather than sorting in Bash:
+
+- Top by CPU: `ps -eo pid,user,pcpu,pmem,comm --sort=-pcpu` (descending by CPU usage)
+- Top by memory: `ps -eo pid,user,pcpu,pmem,comm --sort=-pmem` (descending by memory usage)
+
+The header row is skipped and the process list is trimmed to exactly 5 rows. The `ps` process itself is filtered out if it appears in its own output, so it does not occupy one of the top-5 slots.
+
+If `ps` is unavailable or cannot produce a process listing, the script prints a clear error and exits with a non-zero status.
+
 ## Usage
 
 ```sh
@@ -102,6 +114,24 @@ Disk Usage: 62.5%
 Disk Used: 25.00 GiB
 Disk Available: 15.00 GiB
 Disk Total: 40.00 GiB
+
+Top 5 Processes by CPU Usage
+----------------------------
+PID     USER         CPU%   MEM%  COMMAND
+1234    user         25.4    2.1  web-server
+2345    dbuser       12.1    8.7  postgres
+3456    root          9.3    0.4  systemd
+4567    user          7.8    1.2  sshd
+5678    app           5.2    3.3  node
+
+Top 5 Processes by Memory Usage
+-------------------------------
+PID     USER         CPU%   MEM%  COMMAND
+2345    dbuser       12.1    8.7  postgres
+1234    user         25.4    2.1  web-server
+6789    cache         0.4    6.2  redis-server
+5678    app           5.2    3.3  node
+7890    user          1.1    2.8  chrome
 ```
 
 ## Requirements
