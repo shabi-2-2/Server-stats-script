@@ -15,10 +15,10 @@ Completed phases:
 - **Phase 01 - Setup**: Project structure, executable script, strict shell settings.
 - **Phase 02 - CPU Statistics**: Total CPU usage percentage, calculated from `/proc/stat`.
 - **Phase 03 - Memory Statistics**: Total, used, and available memory plus usage percentage, read from `/proc/meminfo`.
+- **Phase 04 - Disk Statistics**: Total, used, and available disk space for `/`, plus usage percentage, collected with `df -B1 /`.
 
 Not yet implemented (planned for later phases):
 
-- Total disk usage
 - Top 5 processes by CPU usage
 - Top 5 processes by memory usage
 - Optional system information (OS version, uptime, load average, logged-in users, failed login attempts)
@@ -49,7 +49,32 @@ From those values:
 - Used memory = `MemTotal - MemAvailable`
 - Usage percentage = `(Used memory / MemTotal) * 100`
 
-Values are converted from kB to GB (kB / 1024 / 1024).
+Values (reported in KiB by `/proc/meminfo`) are converted to GiB (KiB / 1024 / 1024).
+
+If `/proc/meminfo` is missing or unreadable, the script prints a clear error message and exits with a non-zero status.
+
+## How Disk Usage Is Calculated
+
+Disk statistics cover the root filesystem `/` only and are collected with:
+
+```sh
+df -B1 /
+```
+
+`-B1` forces `df` to report sizes in bytes, so calculations do not rely on human-readable output. The script skips the header row, picks the data row whose mount point is `/`, and reads:
+
+- Total disk space (bytes)
+- Used disk space (bytes)
+- Available disk space (bytes)
+
+From those raw values:
+
+- Disk usage percentage = `(Used / Total) * 100`
+- GiB display values = `bytes / (1024 * 1024 * 1024)`
+
+The percentage is computed from the actual used and total values rather than trusting `df`'s `Use%` column.
+
+Error handling covers: `df` not being available, the root filesystem not being inspectable, and invalid output values. Each case prints a clear error and exits with a non-zero status.
 
 If `/proc/meminfo` is missing or unreadable, the script prints a clear error message and exits with a non-zero status.
 
@@ -67,13 +92,18 @@ Server Performance Stats
 CPU Usage: 23.4%
 
 Memory Usage: 41.2%
-Memory Used: 6.59 GB
-Memory Available: 9.41 GB
-Memory Total: 16.00 GB
+Memory Used: 6.59 GiB
+Memory Available: 9.41 GiB
+Memory Total: 16.00 GiB
+
+Disk Usage: 62.5%
+Disk Used: 25.00 GiB
+Disk Available: 15.00 GiB
+Disk Total: 40.00 GiB
 ```
 
 ## Requirements
 
-- Linux operating system with `/proc/stat` and `/proc/meminfo`
+- Linux operating system with `/proc/stat`, `/proc/meminfo`, and GNU `df`
 - Bash 4+ (required for `mapfile`)
 - No external dependencies

@@ -53,6 +53,38 @@ get_memory_usage() {
     ' /proc/meminfo
 }
 
+get_disk_usage() {
+    local df_output
+
+    if ! command -v df >/dev/null 2>&1; then
+        echo "Error: df command not found. Disk statistics require GNU df." >&2
+        exit 1
+    fi
+
+    df_output=$(df -B1 / 2>/dev/null) || {
+        echo "Error: could not inspect the root filesystem /." >&2
+        exit 1
+    }
+
+    awk '
+        NR > 1 && $NF == "/" {
+            total = $2
+            used = $3
+            available = $4
+        }
+        END {
+            if (total <= 0 || used < 0 || available < 0) {
+                print "Error: invalid df output for /." > "/dev/stderr"
+                exit 1
+            }
+            printf "Disk Usage: %.1f%%\n", (used / total) * 100
+            printf "Disk Used: %.2f GiB\n", used / (1024 * 1024 * 1024)
+            printf "Disk Available: %.2f GiB\n", available / (1024 * 1024 * 1024)
+            printf "Disk Total: %.2f GiB\n", total / (1024 * 1024 * 1024)
+        }
+    ' <<< "$df_output"
+}
+
 main() {
     local cpu_usage
 
@@ -63,6 +95,8 @@ main() {
     printf 'CPU Usage: %s%%\n' "$cpu_usage"
     printf '\n'
     get_memory_usage
+    printf '\n'
+    get_disk_usage
 }
 
 main "$@"
