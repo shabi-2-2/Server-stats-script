@@ -8,7 +8,9 @@ The script targets **Linux** only.
 
 ## Status
 
-Current phase: **Phase 03 - Memory Statistics (complete)**
+Current phase: **Phase 04 - Disk Statistics (complete)**
+
+Next phase: **Phase 05 - Process Statistics**
 
 Completed phases:
 
