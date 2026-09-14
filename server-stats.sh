@@ -30,6 +30,29 @@ get_cpu_usage_linux() {
         'BEGIN { printf "%.1f", 100 * (total - idle) / total }'
 }
 
+get_memory_usage() {
+    if [[ ! -r /proc/meminfo ]]; then
+        echo "Error: /proc/meminfo not found or not readable. Memory statistics require Linux." >&2
+        exit 1
+    fi
+
+    awk '
+        /^MemTotal:/     { total = $2 }
+        /^MemAvailable:/ { available = $2 }
+        END {
+            if (total <= 0 || available < 0) {
+                print "Error: invalid /proc/meminfo data." > "/dev/stderr"
+                exit 1
+            }
+            used = total - available
+            printf "Memory Usage: %.1f%%\n", (used / total) * 100
+            printf "Memory Used: %.2f GiB\n", used / (1024 * 1024)
+            printf "Memory Available: %.2f GiB\n", available / (1024 * 1024)
+            printf "Memory Total: %.2f GiB\n", total / (1024 * 1024)
+        }
+    ' /proc/meminfo
+}
+
 main() {
     local cpu_usage
 
@@ -38,6 +61,8 @@ main() {
     printf '%s\n' "Server Performance Stats"
     printf '%s\n' "========================"
     printf 'CPU Usage: %s%%\n' "$cpu_usage"
+    printf '\n'
+    get_memory_usage
 }
 
 main "$@"

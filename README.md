@@ -8,16 +8,16 @@ The script targets **Linux** only.
 
 ## Status
 
-Current phase: **Phase 02 - CPU Statistics (complete)**
+Current phase: **Phase 03 - Memory Statistics (complete)**
 
 Completed phases:
 
 - **Phase 01 - Setup**: Project structure, executable script, strict shell settings.
 - **Phase 02 - CPU Statistics**: Total CPU usage percentage, calculated from `/proc/stat`.
+- **Phase 03 - Memory Statistics**: Total, used, and available memory plus usage percentage, read from `/proc/meminfo`.
 
 Not yet implemented (planned for later phases):
 
-- Total memory usage
 - Total disk usage
 - Top 5 processes by CPU usage
 - Top 5 processes by memory usage
@@ -37,6 +37,22 @@ Because the sample interval is very short, the result reflects current CPU activ
 
 If `/proc/stat` is unavailable, the script prints a clear error message and exits with a non-zero status.
 
+## How Memory Usage Is Calculated
+
+Memory statistics come from `/proc/meminfo`:
+
+- `MemTotal` - total system memory in kB
+- `MemAvailable` - estimated memory available for starting new applications, in kB
+
+From those values:
+
+- Used memory = `MemTotal - MemAvailable`
+- Usage percentage = `(Used memory / MemTotal) * 100`
+
+Values are converted from kB to GB (kB / 1024 / 1024).
+
+If `/proc/meminfo` is missing or unreadable, the script prints a clear error message and exits with a non-zero status.
+
 ## Usage
 
 ```sh
@@ -49,10 +65,15 @@ If `/proc/stat` is unavailable, the script prints a clear error message and exit
 Server Performance Stats
 ========================
 CPU Usage: 23.4%
+
+Memory Usage: 41.2%
+Memory Used: 6.59 GB
+Memory Available: 9.41 GB
+Memory Total: 16.00 GB
 ```
 
 ## Requirements
 
-- Linux operating system with `/proc/stat`
+- Linux operating system with `/proc/stat` and `/proc/meminfo`
 - Bash 4+ (required for `mapfile`)
 - No external dependencies
