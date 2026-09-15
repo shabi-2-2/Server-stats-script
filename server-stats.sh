@@ -119,6 +119,111 @@ get_process_stats() {
     get_process_table "-pmem" "Top 5 Processes by Memory Usage"
 }
 
+get_os_version() {
+    local version
+
+    if [[ -r /etc/os-release ]]; then
+        version=$(awk -F= '/^PRETTY_NAME=/ {gsub(/["\r]/, "", $2); print $2}' /etc/os-release)
+        if [[ -n "$version" ]]; then
+            echo "$version"
+            return
+        fi
+    fi
+
+    echo "N/A (no /etc/os-release)"
+}
+
+get_uptime() {
+    local seconds days hours minutes text=""
+
+    if [[ ! -r /proc/uptime ]]; then
+        echo "N/A (no /proc/uptime)"
+        return
+    fi
+
+    seconds=$(awk '{print int($1)}' /proc/uptime)
+    if [[ ! "$seconds" =~ ^[0-9]+$ ]]; then
+        echo "N/A (invalid /proc/uptime)"
+        return
+    fi
+
+    days=$((seconds / 86400))
+    hours=$(((seconds % 86400) / 3600))
+    minutes=$(((seconds % 3600) / 60))
+
+    [[ $days -gt 0 ]] && text+="$days days, "
+    [[ $hours -gt 0 ]] && text+="$hours hours, "
+    [[ $minutes -gt 0 ]] && text+="$minutes minutes, "
+    text=${text%, }
+
+    if [[ -n "$text" ]]; then
+        echo "$text"
+    else
+        echo "less than a minute"
+    fi
+}
+
+get_load_average() {
+    local load
+
+    if [[ ! -r /proc/loadavg ]]; then
+        echo "N/A (no /proc/loadavg)"
+        return
+    fi
+
+    load=$(awk '{print $1, $2, $3}' /proc/loadavg)
+    if [[ -z "$load" ]]; then
+        echo "N/A (invalid /proc/loadavg)"
+        return
+    fi
+
+    echo "${load// /, }"
+}
+
+get_logged_in_users() {
+    local count
+
+    if ! command -v who >/dev/null 2>&1; then
+        echo "N/A (who not found)"
+        return
+    fi
+
+    count=$( (who 2>/dev/null || true) | wc -l | tr -d ' ' )
+    echo "$count"
+}
+
+get_failed_logins() {
+    local count logfile=""
+
+    if [[ -r /var/log/auth.log ]]; then
+        logfile=/var/log/auth.log
+    elif [[ -r /var/log/secure ]]; then
+        logfile=/var/log/secure
+    fi
+
+    if [[ -z "$logfile" ]]; then
+        echo "N/A (no readable auth log found)"
+        return
+    fi
+
+    count=$(grep -Ec "Failed password|authentication failure" "$logfile" 2>/dev/null || true)
+    if [[ "$count" =~ ^[0-9]+$ ]]; then
+        echo "$count"
+    else
+        echo "N/A (could not read $logfile)"
+    fi
+}
+
+get_system_info() {
+    printf '%s\n' "System Information"
+    printf '%s\n' "------------------"
+    printf 'OS: %s\n' "$(get_os_version)"
+    printf 'Uptime: %s\n' "$(get_uptime)"
+    printf 'Load Average: %s\n' "$(get_load_average)"
+    printf 'Logged-in Users: %s\n' "$(get_logged_in_users)"
+    printf 'Failed Login Attempts: %s\n' "$(get_failed_logins)"
+}
+
 main() {
     local cpu_usage
 
@@ -133,6 +238,8 @@ main() {
     get_disk_usage
     printf '\n'
     get_process_stats
+    printf '\n'
+    get_system_info
 }
 
 main "$@"

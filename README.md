@@ -19,10 +19,11 @@ Completed phases:
 - **Phase 03 - Memory Statistics**: Total, used, and available memory plus usage percentage, read from `/proc/meminfo`.
 - **Phase 04 - Disk Statistics**: Total, used, and available disk space for `/`, plus usage percentage, collected with `df -B1 /`.
 - **Phase 05 - Process Statistics**: Top 5 processes by CPU usage and top 5 by memory usage, collected with `ps`.
+- **Phase 06 - Optional System Statistics**: OS version, uptime, load average, logged-in users, and failed login attempts.
 
-Not yet implemented (planned for later phases):
+Not yet implemented:
 
-- Optional system information (OS version, uptime, load average, logged-in users, failed login attempts)
+- Final polish and testing
 
 ## How CPU Usage Is Calculated
 
@@ -92,6 +93,37 @@ The header row is skipped and the process list is trimmed to exactly 5 rows. The
 
 If `ps` is unavailable or cannot produce a process listing, the script prints a clear error and exits with a non-zero status.
 
+## How Optional System Statistics Are Collected
+
+The script ends with a `System Information` block containing five optional statistics. Each statistic is gathered independently: a missing file, command, or permission for one statistic never stops the script. When a statistic cannot be obtained, it is reported as `N/A` with a short explanation.
+
+### OS version
+
+Read from `/etc/os-release`, preferring the `PRETTY_NAME` field (e.g. `Ubuntu 24.04 LTS`). If `/etc/os-release` is missing or has no `PRETTY_NAME`, OS is reported as `N/A`.
+
+### Uptime
+
+Read from `/proc/uptime` (seconds) and formatted into days, hours, and minutes (zero units are omitted; sub-minute systems show `less than a minute`). If `/proc/uptime` is missing or unreadable, uptime is reported as `N/A`.
+
+### Load average
+
+Read from `/proc/loadavg`, displaying the 1-minute, 5-minute, and 15-minute averages. If `/proc/loadavg` is missing or unreadable, load average is reported as `N/A`.
+
+### Logged-in users
+
+Counted by running `who` and counting its output lines. If the `who` command is unavailable, the count is reported as `N/A`.
+
+### Failed login attempts
+
+Counted by scanning standard authentication logs for sshd and PAM failure patterns:
+
+- `/var/log/auth.log` (Debian/Ubuntu systems)
+- `/var/log/secure` (RHEL/CentOS systems)
+
+Patterns matched: `Failed password` and `authentication failure`. If no supported log exists or it cannot be read, the count is reported as `N/A`.
+
+Note: failed-login information may be unavailable depending on the Linux distribution, permissions, and authentication setup. For example, systems that log exclusively through `journald` (no on-disk auth log), or logs that require root privileges, will show `N/A`. The script never requires installing additional packages.
+
 ## Usage
 
 ```sh
@@ -132,6 +164,14 @@ PID     USER         CPU%   MEM%  COMMAND
 6789    cache         0.4    6.2  redis-server
 5678    app           5.2    3.3  node
 7890    user          1.1    2.8  chrome
+
+System Information
+------------------
+OS: Ubuntu 24.04 LTS
+Uptime: 2 days, 4 hours
+Load Average: 0.42, 0.38, 0.31
+Logged-in Users: 2
+Failed Login Attempts: 5
 ```
 
 ## Requirements
