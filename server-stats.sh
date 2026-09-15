@@ -26,8 +26,15 @@ get_cpu_usage_linux() {
         delta_total=$((delta_total + curr[i] - prev[i]))
     done
 
-    awk -v idle="$delta_idle" -v total="$delta_total" \
-        'BEGIN { printf "%.1f", 100 * (total - idle) / total }'
+    awk -v idle="$delta_idle" -v total="$delta_total" '
+        BEGIN {
+            if (total <= 0) {
+                print "Error: invalid /proc/stat sampling data." > "/dev/stderr"
+                exit 1
+            }
+            printf "%.1f", 100 * (total - idle) / total
+        }
+    '
 }
 
 get_memory_usage() {
@@ -37,10 +44,10 @@ get_memory_usage() {
     fi
 
     awk '
-        /^MemTotal:/     { total = $2 }
-        /^MemAvailable:/ { available = $2 }
+        /^MemTotal:/     { total = $2; seen_total = 1 }
+        /^MemAvailable:/ { available = $2; seen_available = 1 }
         END {
-            if (total <= 0 || available < 0) {
+            if (!seen_total || !seen_available || total <= 0 || available < 0) {
                 print "Error: invalid /proc/meminfo data." > "/dev/stderr"
                 exit 1
             }
@@ -123,7 +130,13 @@ get_os_version() {
     local version
 
     if [[ -r /etc/os-release ]]; then
-        version=$(awk -F= '/^PRETTY_NAME=/ {gsub(/["\r]/, "", $2); print $2}' /etc/os-release)
+        version=$(awk '/^PRETTY_NAME=/ {
+            sub(/^PRETTY_NAME=/, "")
+            gsub(/^"|"$/, "")
+            gsub(/\r/, "")
+            print
+            exit
+        }' /etc/os-release)
         if [[ -n "$version" ]]; then
             echo "$version"
             return
@@ -231,6 +244,7 @@ main() {
 
     printf '%s\n' "Server Performance Stats"
     printf '%s\n' "========================"
+    printf '\n'
     printf 'CPU Usage: %s%%\n' "$cpu_usage"
     printf '\n'
     get_memory_usage
